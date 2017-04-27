@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-from setuptools import setup, find_packages
+from numpy.distutils.core import Extension, setup
+
+extensions = [Extension('evrot_extensions', ['src/evrot_extensions.c'])]
 
 setup(
     name='scluster',
     version='1.0.0',
-    packages=find_packages(),
+    packages=['scluster'],
     install_requires=[
         "numpy",
-        "numba",
         "pandas"
     ],
     scripts=[
         "bin/sclust.py"
-    ]
+    ],
+    ext_modules=extensions
 )

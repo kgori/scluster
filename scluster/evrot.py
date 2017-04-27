@@ -3,36 +3,10 @@ from __future__ import print_function
 Implements the self-tuning by roation of eigenvectors algorithm of Zelnik-Manor, Lihi, and Pietro Perona. 2004.
 “Self-Tuning Spectral Clustering.” In Advances in Neural Information Processing Systems, 1601–8.
 """
-import numba
+
 import numpy as np
 from math import cos, sin
-
-def sum_dJ(A_x_Y, Y_sq, mv_sq, mv_cb, max_A_values, dim, ndata):
-    return 2 * np.mean((A_x_Y / mv_sq[:,np.newaxis]) -
-                       (max_A_values[:,np.newaxis] * (Y_sq / mv_cb[:,np.newaxis])))
-
-@numba.jit
-def build_Uab(theta, a, b, ik, jk, dim):
-    """
-    Not as fast as pure C, but close enough
-    """
-    Uab = np.eye(dim, dtype=np.double)
-    if b < a:
-        return Uab
-
-    cos_theta = np.cos(theta)
-    sin_theta = np.sin(theta)
-
-    for k in range(a, b+1):
-        m1 = ik[k]
-        m2 = jk[k]
-
-        for n in range(dim):
-            tmp = Uab[n,m1] * cos_theta[k] - Uab[n,m2] * sin_theta[k]
-            Uab[n,m2] = Uab[n,m1] * sin_theta[k] + Uab[n,m2] * cos_theta[k]
-            Uab[n,m1] = tmp
-
-    return Uab
+from evrot_extensions import build_Uab, sum_dJ
 
 def buildA(X, U1, Vk, U2):
     # A = X*U1*Vk*U2
