@@ -14,53 +14,34 @@ def kindex(matrix, k):
     return ix
 
 
-def kscale(matrix, k=7, dists=None):
+def kscale(matrix, k=7, dists=None, minval=0.004):
     """ Returns the local scale based on the k-th nearest neighbour """
     dists = (kdists(matrix, k=k) if dists is None else dists)
     scale = dists.dot(dists.T)
-    return scale
+    return np.clip(scale, minval, np.inf)
+
 
 def affinity(matrix, scale):
     msq = matrix * matrix
     scaled = -msq / scale
     scaled[np.where(np.isnan(scaled))] = 0.0
     a = np.exp(scaled)
-    a.flat[::matrix.shape[0]+1] = 1.0
+    a.flat[::matrix.shape[0]+1] = 0.0  # zero out the diagonal
     return a
 
-def laplace(affinity_matrix, shi_malik_type=False):
-    """ Converts affinity matrix into normalised graph Laplacian,
+
+def laplace(affinity_matrix):
+    """
+    Converts affinity matrix into normalised graph Laplacian,
     for spectral clustering.
-    (At least) two forms exist:
 
-    L = (D^-0.5).A.(D^-0.5) - default
+    L = (D^-0.5).A.(D^-0.5)
+    """
 
-    L = (D^-1).A - `Shi-Malik` type, from Shi Malik paper"""
+    diagonal = affinity_matrix.sum(axis=1) + np.finfo(np.double).eps
+    diagonal = 1.0 / np.sqrt(diagonal)
+    return diagonal[:, np.newaxis] * affinity_matrix * diagonal
 
-    diagonal = affinity_matrix.sum(axis=1) - affinity_matrix.diagonal()
-    zeros = diagonal <= 1e-10
-    diagonal[zeros] = 1
-    if (diagonal <= 1e-10).any():  # arbitrarily small value
-        raise ZeroDivisionError
-    if shi_malik_type:
-        inv_d = np.diag(1 / diagonal)
-        return inv_d.dot(affinity_matrix)
-    diagonal = np.sqrt(diagonal)
-    return affinity_matrix / diagonal / diagonal[:, np.newaxis]
-
-def eigen(matrix):
-    """ Calculates the eigenvalues and eigenvectors of the input matrix.
-    Returns a tuple of (eigenvalues, eigenvectors, cumulative percentage of
-    variance explained). Eigenvalues and eigenvectors are sorted in order of
-    eigenvalue magnitude, high to low """
-
-    (vals, vecs) = np.linalg.eigh(matrix)
-    ind = vals.argsort()[::-1]
-    vals = vals[ind]
-    vecs = vecs[:, ind]
-    vals_ = vals.copy()
-    vals_[vals_ < 0] = 0.
-    return vals, vecs
 
 def normalise_rows(matrix):
     """ Scales all rows to length 1. Fails when row is 0-length, so it
@@ -84,3 +65,16 @@ def distances_to_coordinates(dm, dim):
     aff = affinity(dm, scale)
     lap = laplace(aff)
     return laplace_to_coordinates(lap, dim)
+
+
+def eigen(matrix, n):
+    """ Calculates the eigenvalues and eigenvectors of the input matrix.
+    Returns a tuple of (eigenvalues, eigenvectors, cumulative percentage of
+    variance explained). Eigenvalues and eigenvectors are sorted in order of
+    eigenvalue magnitude, high to low """
+
+    (vals, vecs) = np.linalg.eigh(matrix)
+    ind = vals.argsort()[::-1]
+    vals = vals[ind]
+    vecs = vecs[:, ind]
+    return vals[:n], vecs[:,:n]

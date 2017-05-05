@@ -1,4 +1,12 @@
-from scluster.evrot import cluster_rotate
+from __future__ import print_function
+
+"""
+Implements the self-tuning by roation of eigenvectors algorithm of Zelnik-Manor, Lihi, and Pietro Perona. 2004.
+"Self-Tuning Spectral Clustering." In Advances in Neural Information Processing Systems, 1601-8.
+"""
+import numpy as np
+from scluster.distances import eigen, laplace
+from evrot import evrot
 
 class Result(object):
 
@@ -38,33 +46,47 @@ def order(l):
     return tuple(l2)
 
 
-def spectral_rotate(coordinates, min_groups=2, max_groups=None,
-                    kmeans=False, verbose=True):
-    (nclusters, clustering, quality_scores, rotated_vectors) = \
-        cluster_rotate(coordinates, max_groups=max_groups,
-                       min_groups=min_groups)
+def cluster_rotate(A, group_num=None, method=None):
+    """
+    cluster by rotating eigenvectors to align with the canonical coordinate
+    system
 
-    translate_clustering = [None] * coordinates.shape[0]
-    no_of_empty_clusters = 0
-    for (group_number, group_membership) in enumerate(clustering):
-        if len(group_membership) == 0:
-            no_of_empty_clusters += 1
-        for index in group_membership:
-            translate_clustering[index - 1] = group_number
-    T = order(translate_clustering)
-    if no_of_empty_clusters > 0:
-        print('Subtracting {0} empty {1}'.format(no_of_empty_clusters,
-                                           ('cluster' if no_of_empty_clusters == 1 else 'clusters')))
-        nclusters -= no_of_empty_clusters
+    :param A: Affinity matrix
+    :param group_num: an array of group numbers to test
+                      it is assumed to be a continuous set
+    :param method:    method - 1   gradient descent
+                   2   approximate gradient descent
+    :return: clusts - a cell array of the results for each group number
+             best_group_index - the group number index with best alignment quality
+             Quality = the final quality for all tested group numbers
+             Vr = the rotated eigenvectors
+    """
+    if group_num is None:
+        group_num = [2,3,4,5,6]
 
-    # ######################
+    if method is None:
+        method = 1  # change to any other value to estimate gradient numerically
 
-    if verbose:
-        print('Discovered {0} clusters'.format(nclusters))
-        print('Quality scores: {0}'.format(quality_scores))
-        # if kmeans:
-        #     print('Pre-KMeans clustering: {0}'.format(clustering))
-    # if kmeans:
-    #     T = self.kmeans(nclusters, rotated_vectors)
+    group_num = [x for x in sorted(group_num) if not x == 1]
 
-    return Result(T, [cl for cl in clustering if len(cl > 0)], nclusters, quality_scores)
+    nclusts = max(group_num)
+    evals, V = eigen(laplace(A), nclusts)
+
+    # Rotate eigenvectors
+    Vr = np.zeros_like(V)
+    Vr[:, :group_num[0] - 1] = V[:, :group_num[0] - 1]
+    # rotated = [None] * len(group_num)
+    clusts = [None] * len(group_num)
+    quality = np.zeros(len(group_num))
+
+    # for g in range(len(group_num)):
+    for i, g in enumerate(group_num):
+        print ("Testing {} clusters...".format(group_num[i]))
+        Vcurr = Vr[:, :g]
+        Vcurr[:, g - 1] = V[:, g - 1]
+        clusts[i], quality[i], Vr[:, :g] = evrot(Vcurr, method)
+
+    i = np.where(quality.max() - quality < 0.001)[0]
+    best_group_index = i[-1]
+
+    return clusts, best_group_index, quality, Vr
