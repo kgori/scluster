@@ -73,8 +73,9 @@ def cluster_rotate(A, group_num=None, method=None):
     evals, V = eigen(laplace(A), nclusts)
 
     # Rotate eigenvectors
-    Vr = np.zeros_like(V)
-    Vr[:, :group_num[0] - 1] = V[:, :group_num[0] - 1]
+    Vr = [None] * len(group_num)  # List holding best rotated eigenvectors for each iteration
+    Vbuffer = np.zeros_like(V)  # Buffer holding rotated eigenvectors (changes each iteration)
+    Vbuffer[:, :group_num[0] - 1] = V[:, :group_num[0] - 1]
     # rotated = [None] * len(group_num)
     clusts = [None] * len(group_num)
     quality = np.zeros(len(group_num))
@@ -82,9 +83,10 @@ def cluster_rotate(A, group_num=None, method=None):
     # for g in range(len(group_num)):
     for i, g in enumerate(group_num):
         print ("Testing {} clusters...".format(group_num[i]))
-        Vcurr = Vr[:, :g]
+        Vcurr = Vbuffer[:, :g]
         Vcurr[:, g - 1] = V[:, g - 1]
-        clusts[i], quality[i], Vr[:, :g] = evrot(Vcurr, method)
+        clusts[i], quality[i], Vbuffer[:, :g] = evrot(Vcurr, method)
+        Vr[i] = Vbuffer[:, :g].copy()
 
     i = np.where(quality.max() - quality < 0.001)[0]
     best_group_index = i[-1]
