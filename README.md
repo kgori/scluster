@@ -1,5 +1,6 @@
 # scluster
-Implementation of self-tuning spectral clustering from Zelnik-Manor and Perona (2004)
+An implementation in Python of the self-tuning spectral clustering algorithm from Zelnik-Manor and Perona (2004).
+The original Matlab implementation can be found [here](https://lihi.eew.technion.ac.il/files/Demos/SelfTuningClustering.html "Self-tuning spectral clustering project page").
 
 Example usage: sclust.py [--scale INT] distances.csv min=2 max=12
 
